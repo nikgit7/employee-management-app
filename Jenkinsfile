@@ -1,5 +1,6 @@
 pipeline {
   environment {
+    DOCKERHUB_CREDENTIALS = credentials('dockerhublogin')
     image1 = "nikhildocker28/frontend-k8s"
     image2 = "nikhildocker28/k8s-backend"
     image3 = "nikhildocker28/k8s-db"
@@ -21,14 +22,13 @@ pipeline {
         }
       }
     }
-    stage('Pushing Image to DockerHub'){
-      environment {
-        registryCredential = 'dockerhublogin'
-      }
-      
+    stage('Login DockerHub'){
       steps{
+        sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+      }
+    }
+    stage ('Pushing Image to DockerHub'){
         script {
-          docker.withRegistry('https://registry.hub.docker.com', registryCredential){
             sh "docker push nikhildocker28/frontend-k8s:latest"
             sh "docker push nikhildocker28/k8s-backend:latest"
             sh "docker push nikhildocker28/k8s-db:latest"
@@ -46,5 +46,3 @@ pipeline {
          }
       }
     }
-  }
-}
