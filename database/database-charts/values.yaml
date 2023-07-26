@@ -1,0 +1,6 @@
+image:
+  repository: nikhildocker28/k8s-db
+  tag: latest
+
+service:
+  clusterIP: 10.107.180.2
