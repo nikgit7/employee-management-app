@@ -1,0 +1,98 @@
+pipeline {
+  environment {
+    DOCKERHUB_CREDENTIALS = credentials('dockerhublogin')
+    github_token = credentials('github-token')
+    image1 = "nikhildocker28/frontend-k8s"
+    image2 = "nikhildocker28/k8s-backend"
+    image3 = "nikhildocker28/k8s-db"
+    repoUrlWithAuth = "https://nikgit7:$github_token@github.com/nikgit7/employee-management-app.git"
+    sourceBranch = "master"
+  }
+  
+  agent any
+  stages {
+    stage('Git Checkout') {
+      steps {
+        git 'https://github.com/nikgit7/employee-management-app.git'
+      }
+    }
+    
+    stage('Build Images') {
+      steps {
+        script {
+          sh "docker build -t $image1 frontend/"
+          sh "docker build -t $image2 backend/"
+          sh "docker build -t $image3 database/"
+        }
+      }
+    }
+    
+    stage('Login DockerHub') {
+      steps {
+        sh "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"
+      }
+    }
+    
+    stage('Push Images to DockerHub') {
+      steps {
+        script {
+          sh "docker push $image1:latest"
+          sh "docker push $image2:latest"
+          sh "docker push $image3:latest"
+        }
+      }
+    }
+    
+    stage('Packaging helm charts') {
+      steps {
+        script {
+          sh "pwd"
+          sh "helm package frontend/frontend-chart --version 0.1.0 && helm package backend/backend-chart --version 0.1.0 && helm package database/database-charts --version 0.1.0"
+        }
+      }
+    }
+    
+    stage('pushing helm packages to github'){
+      steps{
+        script {
+          
+            sh "git config --global user.name 'nikgit7'"
+            sh "git config --global user.email 'niksharma421@gmail.com'"
+            sh "git add frontend-chart-0.1.0.tgz backend-chart-0.1.0.tgz mysql-chart-0.1.0.tgz"
+            sh "git commit -m 'updated'"
+            
+            sh "git push --repo=${repoUrlWithAuth} --set-upstream ${repoUrlWithAuth} ${sourceBranch}"
+          
+        }
+      }
+    }
+    
+    stage('Uninstalling helm packages if earlier installed') {
+    steps {
+        script {
+            def installedPackages = sh(returnStdout: true, script: 'helm list -q').trim().split('\n')
+            for (pkg in ['frontend-chart', 'backend-chart', 'mysql-chart']) {
+                if (installedPackages.contains(pkg)) {
+                    sh "helm uninstall ${pkg}"
+                } else {
+                    echo "Package '${pkg}' is not installed. Skipping uninstallation."
+                }
+            }
+        }
+    }
+}
+
+
+
+    
+    stage('installing helm packages'){
+      steps{
+        script {
+            sh "cd frontend && helm install frontend-chart ../frontend-chart-0.1.0.tgz"
+            sh "cd backend && helm install backend-chart ../backend-chart-0.1.0.tgz"
+            sh "cd database && helm install database-charts ../mysql-chart-0.1.0.tgz"
+        }
+      }
+    }
+  }
+}
